@@ -93,7 +93,7 @@ Since our experiments were primarily conducted on the **MVTec-AD** dataset, we p
 
 | Dataset | Model | Download |
 |---|---|---|
-| MVTec-AD | WaDCD UNet_L | [Download](https://github.com/SDUSTVIGroup/WaDCD/releases/tag/untagged-5c92a931cdc8ec39df63) |
+| MVTec-AD | WaDCD UNet_L | [Download](https://github.com/SDUSTVIGroup/WaDCD/releases/download/v1.0/WaDCD_mvtec_UNet_L.pt) |
 
 ---
 
@@ -120,10 +120,6 @@ Below are some sample outputs showing the performance of WaDCD on real anomaly d
 
 ## 📚 Citation
 
-If you find WaDCD useful in your research, please cite our work:
+If you find this project useful, please consider starring this repository.
 
-```bibtex
-
-```
-
----
+Citation information will be updated once the paper is available.
