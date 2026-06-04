@@ -60,21 +60,6 @@ torchrun train_WaDCD.py \
     --use-wavelet-sdem-gate true \
     --wavelet-combine-mode sum
 ```
-
-### Arguments
-
-| Argument | Description |
-|---|---|
-| `--dataset` | Dataset name, choose `mvtec` or `visa` |
-| `--data-dir` | Path to the dataset |
-| `--model-size` | Model size, e.g. `UNet_L` |
-| `--object-category` | Object category to train on, use `all` for multi-class training |
-| `--image-size` | Input image size |
-| `--center-size` | Center crop size |
-| `--center-crop` | Whether to apply center crop |
-
----
-
 ## 🧪 Testing
 
 After training, evaluate the model using:
@@ -131,7 +116,7 @@ They may differ slightly from the results reported in the paper, as they were ob
 
 Below are some sample outputs showing the performance of WaDCD on real anomaly detection data.
 
-![WaDCD Samples](<img width="1517" height="857" alt="Fig 3" src="https://github.com/user-attachments/assets/3195d267-5f46-4721-8d3e-aa6a3a0f73bc" />
+(<img width="1517" height="857" alt="Fig 3" src="https://github.com/user-attachments/assets/3195d267-5f46-4721-8d3e-aa6a3a0f73bc" />
 <img width="1516" height="853" alt="Fig 4" src="https://github.com/user-attachments/assets/6f700767-8064-469b-baa3-4c3654e90bde" />
 
 )
@@ -148,8 +133,3 @@ If you find WaDCD useful in your research, please cite our work:
 ```
 
 ---
-
-## 🙏 Acknowledgements
-
-This project builds upon diffusion-based generative modeling and unsupervised anomaly detection research.  
-We thank the authors of MVTec-AD, VisA, and LDM for their valuable datasets and pretrained models.
