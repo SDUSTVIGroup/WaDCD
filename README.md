@@ -89,12 +89,7 @@ python evaluation_WaDCD.py \
 
 The performance of WaDCD on MVTec-AD and VisA is reported in the table below.
 
-The following results are obtained from our best trained models. Since our experiments were primarily conducted on the **MVTec-AD** dataset, we provide the corresponding pretrained weights for **WaDCD UNet_L** to facilitate evaluation and reproducibility. The pretrained weights can be downloaded from [Download](https://github.com/SDUSTVIGroup/WaDCD/releases/download/v1.0/WaDCD_mvtec_UNet_L.pt).
-
-| Dataset | I-AUROC | I-AP | I-f1max | P-AUROC | P-AP | P-f1max | P-AUPRO |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| MVTec-AD | 99.2 | 99.7 | 98.7 | 98.8 | 76.8 | 71.1 | 95.1 |
-| VisA | 96.2 | 97.0 | 92.6 | 98.3 | 57.5 | 56.4 | 91.5 |
+The following results are obtained from our best trained models. Since our experiments were primarily conducted on the **MVTec-AD** dataset, we provide the corresponding pretrained weights for **WaDCD UNet_L** to facilitate evaluation and reproducibility. The pretrained weights can be downloaded from [here](https://github.com/SDUSTVIGroup/WaDCD/releases/download/v1.0/WaDCD_mvtec_UNet_L.pt).
 
 | Dataset | I-AUROC | I-AP | I-f1max | P-AUROC | P-AP | P-f1max | P-AUPRO |
 |---|---:|---:|---:|---:|---:|---:|---:|
