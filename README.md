@@ -87,15 +87,13 @@ python evaluation_WaDCD.py \
 
 ## 📦 Pretrained Weights
 
-We provide pretrained weights for **WaDCD UNet_L** for rapid inference and further experimentation.
+## 📦 Pretrained Weights
 
-### MVTec-AD Pretrained Weights
+Since our experiments were primarily conducted on the **MVTec-AD** dataset, we provide pretrained weights for **WaDCD UNet_L** on MVTec-AD for convenient evaluation and reproducibility.
 
-- [Download from Google Drive](#)
-
-### VisA Pretrained Weights
-
-- [Download from Google Drive](#)
+| Dataset | Model | Download |
+|---|---|---|
+| MVTec-AD | WaDCD UNet_L | [Download](https://github.com/SDUSTVIGroup/WaDCD/releases/tag/untagged-5c92a931cdc8ec39df63) |
 
 ---
 
