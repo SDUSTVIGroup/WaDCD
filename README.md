@@ -51,7 +51,14 @@ torchrun train_WaDCD.py \
     --object-category all \
     --image-size 288 \
     --center-size 256 \
-    --center-crop True
+    --center-crop True \
+    --wavelet-loss True \
+    --dual-schedule True \
+    --noise-schedule-low squaredcos_cap_v2 \
+    --noise-schedule-high linear \
+    --auto-lambda-hf true \
+    --use-wavelet-sdem-gate true \
+    --wavelet-combine-mode sum
 ```
 
 ### Arguments
@@ -83,6 +90,12 @@ python evaluation_WaDCD.py \
     --center-size 256 \
     --center-crop True \
     --model-path /path/to/pretrained_weights.pt
+    --dual-schedule True \
+    --noise-schedule-low squaredcos_cap_v2 \
+    --noise-schedule-high linear \
+    --dual-schedule-sampling True \
+    --use-wavelet-sdem-gate true \
+    --wavelet-combine-mode sum
 ```
 
 ---
@@ -101,22 +114,6 @@ We provide pretrained weights for **WaDCD UNet_L** for rapid inference and furth
 
 ---
 
-## 🔥 ImageNet Pretrained Model
-
-Using an ImageNet-pretrained model can slightly improve performance and robustness.
-
-You can download the pretrained model provided by the LDM repository:
-
-- [Download LDM Pretrained Model](#)
-
-To use the pretrained model, set:
-
-```bash
---from-scratch False \
---pretrained /path/to/pretrained_checkpoint.ckpt
-```
-
----
 
 ## 📊 Results
 
@@ -134,9 +131,11 @@ They may differ slightly from the results reported in the paper, as they were ob
 
 Below are some sample outputs showing the performance of WaDCD on real anomaly detection data.
 
-![WaDCD Samples](<img width="1731" height="592" alt="vis" src="https://github.com/user-attachments/assets/4e00d85e-0ff6-4975-9ce8-0eba0034981a" />)
+![WaDCD Samples](<img width="1517" height="857" alt="Fig 3" src="https://github.com/user-attachments/assets/3195d267-5f46-4721-8d3e-aa6a3a0f73bc" />
+<img width="1516" height="853" alt="Fig 4" src="https://github.com/user-attachments/assets/6f700767-8064-469b-baa3-4c3654e90bde" />
 
-> Please replace `assets/sample_results.png` with the actual path to your sample result image.
+)
+
 
 ---
 
@@ -147,12 +146,6 @@ If you find WaDCD useful in your research, please cite our work:
 ```bibtex
 
 ```
-
----
-
-## 📄 License
-
-Please refer to the repository license for details.
 
 ---
 
