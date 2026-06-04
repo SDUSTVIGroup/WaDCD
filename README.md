@@ -43,7 +43,7 @@ After downloading, organize the dataset and specify its path using `--data-dir`.
 
 Train WaDCD with the following command:
 
-```bash
+```
 torchrun train_WaDCD.py \
     --dataset mvtec \
     --data-dir /path/to/dataset \
@@ -64,7 +64,7 @@ torchrun train_WaDCD.py \
 
 After training, evaluate the model using:
 
-```bash
+```
 python evaluation_WaDCD.py \
     --dataset mvtec \
     --data-dir /path/to/dataset \
@@ -78,7 +78,7 @@ python evaluation_WaDCD.py \
     --dual-schedule True \
     --noise-schedule-low squaredcos_cap_v2 \
     --noise-schedule-high linear \
-    --dual-schedule-sampling True \
+    --dual-schedule-sampling true \
     --use-wavelet-sdem-gate true \
     --wavelet-combine-mode sum
 ```
@@ -103,7 +103,6 @@ We provide pretrained weights for **WaDCD UNet_L** for rapid inference and furth
 ## 📊 Results
 
 The following results are obtained using the best trained models provided in this repository.  
-They may differ slightly from the results reported in the paper, as they were obtained using optimized training parameters.
 
 | Dataset | I-AUROC | I-AP | I-f1max | P-AUROC | P-AP | P-f1max | P-AUPRO |
 |---|---:|---:|---:|---:|---:|---:|---:|
@@ -116,11 +115,8 @@ They may differ slightly from the results reported in the paper, as they were ob
 
 Below are some sample outputs showing the performance of WaDCD on real anomaly detection data.
 
-(<img width="1517" height="857" alt="Fig 3" src="https://github.com/user-attachments/assets/3195d267-5f46-4721-8d3e-aa6a3a0f73bc" />
+<img width="1517" height="857" alt="Fig 3" src="https://github.com/user-attachments/assets/3195d267-5f46-4721-8d3e-aa6a3a0f73bc" />
 <img width="1516" height="853" alt="Fig 4" src="https://github.com/user-attachments/assets/6f700767-8064-469b-baa3-4c3654e90bde" />
-
-)
-
 
 ---
 
