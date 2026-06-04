@@ -87,8 +87,6 @@ python evaluation_WaDCD.py \
 
 ## 📦 Pretrained Weights
 
-## 📦 Pretrained Weights
-
 Since our experiments were primarily conducted on the **MVTec-AD** dataset, we provide pretrained weights for **WaDCD UNet_L** on MVTec-AD for convenient evaluation and reproducibility.
 
 | Dataset | Model | Download |
@@ -100,7 +98,8 @@ Since our experiments were primarily conducted on the **MVTec-AD** dataset, we p
 
 ## 📊 Results
 
-The following results are obtained using the best trained models provided in this repository.  
+The following results are obtained from our best trained models.  
+Since our experiments were primarily conducted on the **MVTec-AD** dataset, we provide the corresponding pretrained weights for **WaDCD UNet_L** to facilitate evaluation and reproducibility.
 
 | Dataset | I-AUROC | I-AP | I-f1max | P-AUROC | P-AP | P-f1max | P-AUPRO |
 |---|---:|---:|---:|---:|---:|---:|---:|
