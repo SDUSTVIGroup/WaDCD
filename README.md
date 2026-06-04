@@ -8,8 +8,6 @@
 
 ## 🎨 Approach
 
-**WaDCD** is a reformulated diffusion-based framework designed for multi-class unsupervised anomaly detection.  
-It learns the distribution of normal samples and detects anomalies by correcting deviations from normality.
 <img width="1767" height="845" alt="image1" src="https://github.com/user-attachments/assets/2613fac5-24a7-4f0c-96c4-57b891d60dbc" />
 <img width="1764" height="892" alt="image2" src="https://github.com/user-attachments/assets/44d629d1-83e9-4f0e-afe8-8585acbcdc87" />
 
@@ -34,8 +32,8 @@ pip3 install -r requirements.txt
 
 Please download the datasets from the official sources:
 
-- [MVTec-AD](https://www.mvtec.com/company/research/datasets/mvtec-ad)
-- [VisA](https://github.com/amazon-science/spot-diff)
+- [MVTec-AD](https://www.mvtec.com/research-teaching/datasets/mvtec-ad)
+- [VisA](https://amazon-visual-anomaly.s3.us-west-2.amazonaws.com/VisA_20220922.tar)
 
 After downloading, organize the dataset and specify its path using `--data-dir`.
 
@@ -136,7 +134,7 @@ They may differ slightly from the results reported in the paper, as they were ob
 
 Below are some sample outputs showing the performance of WaDCD on real anomaly detection data.
 
-![WaDCD Samples](assets/sample_results.png)
+![WaDCD Samples](<img width="1731" height="592" alt="vis" src="https://github.com/user-attachments/assets/4e00d85e-0ff6-4975-9ce8-0eba0034981a" />)
 
 > Please replace `assets/sample_results.png` with the actual path to your sample result image.
 
@@ -147,13 +145,7 @@ Below are some sample outputs showing the performance of WaDCD on real anomaly d
 If you find WaDCD useful in your research, please cite our work:
 
 ```bibtex
-@inproceedings{beizaee2025correcting,
-  title={Correcting deviations from normality: A reformulated diffusion model for multi-class unsupervised anomaly detection},
-  author={Beizaee, Farzad and Lodygensky, Gregory A and Desrosiers, Christian and Dolz, Jose},
-  booktitle={Proceedings of the Computer Vision and Pattern Recognition Conference},
-  pages={19088--19097},
-  year={2025}
-}
+
 ```
 
 ---
