@@ -6,7 +6,7 @@
 
 ---
 
-## 🎨 Approach
+## Approach
 
 <img width="1767" height="845" alt="image1" src="https://github.com/user-attachments/assets/2613fac5-24a7-4f0c-96c4-57b891d60dbc" />
 <img width="1764" height="892" alt="image2" src="https://github.com/user-attachments/assets/44d629d1-83e9-4f0e-afe8-8585acbcdc87" />
@@ -14,7 +14,7 @@
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### 🛠️ Environment Setup
 
@@ -28,7 +28,7 @@ pip3 install -r requirements.txt
 
 ---
 
-## 📁 Datasets
+## Datasets
 
 Please download the datasets from the official sources:
 
@@ -39,7 +39,7 @@ After downloading, organize the dataset and specify its path using `--data-dir`.
 
 ---
 
-## 🏋️ Training
+## Training
 
 Train WaDCD with the following command:
 
@@ -60,7 +60,7 @@ torchrun train_WaDCD.py \
     --use-wavelet-sdem-gate true \
     --wavelet-combine-mode sum
 ```
-## 🧪 Testing
+## Testing
 
 After training, evaluate the model using:
 
@@ -85,7 +85,7 @@ python evaluation_WaDCD.py \
 
 ---
 
-## 📊 Results
+## Results
 
 The performance of WaDCD on MVTec-AD and VisA is reported in the table below.
 
@@ -98,7 +98,7 @@ The following results are obtained from our best trained models. Since our exper
 
 ---
 
-## 📸 Sample Results
+## Sample Results
 
 Below are some sample outputs showing the performance of WaDCD on real anomaly detection data.
 
@@ -107,7 +107,7 @@ Below are some sample outputs showing the performance of WaDCD on real anomaly d
 
 ---
 
-## 📚 Citation
+## Citation
 
 If you find this project useful, please consider starring this repository.
 
