@@ -74,7 +74,7 @@ python evaluation_WaDCD.py \
     --image-size 288 \
     --center-size 256 \
     --center-crop True \
-    --model-path /path/to/pretrained_weights.pt
+    --model-path /path/to/pretrained_weights.pt \
     --dual-schedule True \
     --noise-schedule-low squaredcos_cap_v2 \
     --noise-schedule-high linear \
