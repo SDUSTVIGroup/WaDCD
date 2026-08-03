@@ -112,28 +112,71 @@ class WaveletMFFA(nn.Module):
 
 
 class WaveletSDEMGate(nn.Module):
-    """Lightweight SDEM-style gate on band-wise DoD.
+    """LL-guided high-frequency gate corresponding to the paper's WGDRB.
 
-    Uses pooled coeffs + dod_bands to generate a per-channel gate in (0,1).
+    Wavelet coefficient order used by DWT_2D:
+        [LL, LH, HL, HH]
     """
 
     def __init__(self, channels: int, reduction: int = 4):
         super().__init__()
+
+        if channels % 4 != 0:
+            raise ValueError(
+                f"Expected wavelet channels divisible by 4, got {channels}"
+            )
+
         self.channels = channels
-        hidden = max(channels // reduction, 8)
+        self.latent_channels = channels // 4
+
+        hidden = max(self.latent_channels // reduction, 1)
+
         self.pool = nn.AdaptiveAvgPool2d(1)
         self.mlp = nn.Sequential(
-            nn.Conv2d(channels * 2, hidden, kernel_size=1),
+            # FC1 after GAP: C -> C/reduction
+            nn.Conv2d(
+                self.latent_channels,
+                hidden,
+                kernel_size=1,
+            ),
             nn.SiLU(),
-            nn.Conv2d(hidden, channels, kernel_size=1),
+
+            # FC2: C/reduction -> 3C
+            nn.Conv2d(
+                hidden,
+                3 * self.latent_channels,
+                kernel_size=1,
+            ),
             nn.Sigmoid(),
         )
 
-    def forward(self, dod_bands: torch.Tensor, coeffs: torch.Tensor) -> torch.Tensor:
-        # dod_bands / coeffs: (B,4C,H/2,W/2)
-        pooled = self.pool(torch.cat([dod_bands, coeffs], dim=1))
-        gate = self.mlp(pooled)
-        return dod_bands * gate
+    def forward(
+        self,
+        dod_bands: torch.Tensor,
+        coeffs: torch.Tensor,
+    ) -> torch.Tensor:
+        del dod_bands  # WGDRB directly gates the original wavelet coefficients.
+
+        c = self.latent_channels
+
+        if coeffs.ndim != 4 or coeffs.shape[1] != 4 * c:
+            raise ValueError(
+                f"Expected coefficients with {4 * c} channels, "
+                f"got shape {tuple(coeffs.shape)}"
+            )
+
+        # DWT_2D output order: [LL, LH, HL, HH]
+        z_ll = coeffs[:, :c]
+        z_hf = coeffs[:, c:]  # concat(LH, HL, HH)
+
+        # g_t = sigmoid(FC2(SiLU(FC1(GAP(z_t^LL)))))
+        gate = self.mlp(self.pool(z_ll))
+
+        # Only high-frequency subbands are gated.
+        gated_hf = gate * z_hf
+
+        # LL remains unchanged before IDWT.
+        return torch.cat([z_ll, gated_hf], dim=1)
 
 
 class WaveletDoDPredictor(nn.Module):
