@@ -56,7 +56,6 @@ torchrun train_WaDCD.py \
     --dual-schedule True \
     --noise-schedule-low squaredcos_cap_v2 \
     --noise-schedule-high linear \
-    --auto-lambda-hf true \
     --use-wavelet-sdem-gate true \
     --wavelet-combine-mode sum
 ```
