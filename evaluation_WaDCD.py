@@ -427,7 +427,7 @@ if __name__ == "__main__":
     parser.add_argument("--object-category", type=str, default='all')
     parser.add_argument("--model-path", type=str, default='.')
     parser.add_argument("--anomaly-class", type=str, default='all')
-    parser.add_argument("--reverse-steps", type=int, default=5)
+    parser.add_argument("--reverse-steps", type=int, default=20)
     # 扩散/调度相关（与训练保持一致用法）
     parser.add_argument("--diffusion-steps", type=int, default=20, help="扩散总步数，应 >= reverse-steps")
     parser.add_argument("--timestep-respacing", type=str, default=None, help="自定义respacing，如 ddim20；缺省按 reverse-steps 生成")
