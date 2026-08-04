@@ -165,6 +165,7 @@ class GaussianDiffusion:
         use_wavelet_loss: bool = False,
         freq_noise_scale_high: float | None = None,
         dual_schedule_sampling: bool = False,
+        wavelet_type: str = "haar",
     ):
         self.model_mean_type = model_mean_type
         self.model_var_type = model_var_type
@@ -175,6 +176,7 @@ class GaussianDiffusion:
         self.freq_noise_scale_high = freq_noise_scale_high
         self.use_dual_schedule = (betas_low is not None) and (betas_high is not None)
         self.dual_schedule_sampling = bool(dual_schedule_sampling) and self.use_dual_schedule
+        self.wavelet_type = wavelet_type
 
         # Use float64 for accuracy.
         betas = np.array(betas, dtype=np.float64)
@@ -234,6 +236,16 @@ class GaussianDiffusion:
         if self.deviatoin_coeff.shape[0] > 0:
             self.deviatoin_coeff[0] = 0.0
 
+
+    def _get_wavelet(self):
+        """Return (dwt, iwt) based on wavelet_type."""
+        if self.wavelet_type == "db2":
+            from freq_wavelet_db2 import db2DWT, db2IWT
+            return db2DWT(), db2IWT()
+        else:
+            from freq_wavelet import HaarDWT, HaarIWT
+            return HaarDWT(), HaarIWT()
+
     def q_mean_variance(self, x_start, t):
         """
         Get the distribution q(x_t | x_0).
@@ -261,8 +273,7 @@ class GaussianDiffusion:
                 noise = th.randn_like(x_start)
             # 可选：频带噪声缩放（近似不同beta）
             if self.freq_noise_scale_high is not None:
-                from freq_wavelet import HaarDWT, HaarIWT
-                dwt = HaarDWT(); iwt = HaarIWT()
+                dwt, iwt = self._get_wavelet()
                 nz_d = dwt(noise)
                 B, C4, Hh, Wh = nz_d.shape
                 C = C4 // 4
@@ -279,8 +290,7 @@ class GaussianDiffusion:
             # 频域双调度版本
             if noise is None:
                 noise = th.randn_like(x_start)
-            from freq_wavelet import HaarDWT, HaarIWT
-            dwt = HaarDWT(); iwt = HaarIWT()
+            dwt, iwt = self._get_wavelet()
             x_d = dwt(x_start)
             n_d = dwt(noise)
             B, C4, Hh, Wh = x_d.shape
@@ -299,12 +309,93 @@ class GaussianDiffusion:
             return mask * x_start + (1 - mask) * x_t_raw
 
 
-    def direction_of_deviation(self, noise, x_start, mask, t):
+    def direction_of_deviation(
+        self,
+        noise,
+        x_start,
+        mask,
+        t,
+        x_t=None,
+    ):
+        """Construct the DoD supervision target.
+
+        The original spatial-domain target is retained for a single
+        diffusion schedule. With dual frequency schedules, the target is
+        derived from the final masked forward latent ``x_t`` so that its
+        LL and HF components use their corresponding cumulative noise
+        scales.
+        """
         assert noise.shape == x_start.shape
-        
-        return ( (1 - mask) * (
-            noise - _extract_into_tensor(self.deviatoin_coeff, t, x_start.shape) * x_start)
-        )
+
+        if not self.use_dual_schedule:
+            return (
+                (1 - mask)
+                * (
+                    noise
+                    - _extract_into_tensor(
+                        self.deviatoin_coeff,
+                        t,
+                        x_start.shape,
+                    )
+                    * x_start
+                )
+            )
+
+        if x_t is None:
+            raise ValueError(
+                "x_t is required when constructing a dual-schedule DoD target."
+            )
+        if x_t.shape != x_start.shape:
+            raise ValueError(
+                f"x_t and x_start must have the same shape, got "
+                f"{tuple(x_t.shape)} and {tuple(x_start.shape)}."
+            )
+
+        dwt, iwt = self._get_wavelet()
+        x0_d = dwt(x_start)
+        xt_d = dwt(x_t)
+
+        if x0_d.shape != xt_d.shape:
+            raise RuntimeError(
+                f"DWT shape mismatch: x_start={tuple(x0_d.shape)}, "
+                f"x_t={tuple(xt_d.shape)}."
+            )
+
+        channels4 = x0_d.shape[1]
+        if channels4 % 4 != 0:
+            raise RuntimeError(
+                f"Expected the DWT channel count to be divisible by 4, "
+                f"got {channels4}."
+            )
+        channels = channels4 // 4
+
+        x0_ll = x0_d[:, :channels]
+        x0_hf = x0_d[:, channels:]
+        xt_ll = xt_d[:, :channels]
+        xt_hf = xt_d[:, channels:]
+
+        scale_ll = _extract_into_tensor(
+            self.sqrt_one_minus_alphas_cumprod_low,
+            t,
+            xt_ll.shape,
+        ).clamp_min(1e-8)
+        scale_hf = _extract_into_tensor(
+            self.sqrt_one_minus_alphas_cumprod_high,
+            t,
+            xt_hf.shape,
+        ).clamp_min(1e-8)
+
+        target_ll = (xt_ll - x0_ll) / scale_ll
+        target_hf = (xt_hf - x0_hf) / scale_hf
+        target_d = th.cat([target_ll, target_hf], dim=1)
+        target = iwt(target_d)
+
+        if target.shape != x_start.shape:
+            raise RuntimeError(
+                f"IWT target shape mismatch: expected {tuple(x_start.shape)}, "
+                f"got {tuple(target.shape)}."
+            )
+        return target.detach()
 
 
     def q_posterior_mean_variance(self, x_start, x_t, t):
@@ -869,26 +960,38 @@ class GaussianDiffusion:
                 )[0],
                 ModelMeanType.START_X: x_start,
                 ModelMeanType.EPSILON: noise,
-                ModelMeanType.DEVIATION: self.direction_of_deviation(noise, x_start, mask, t),
+                ModelMeanType.DEVIATION: self.direction_of_deviation(
+                    noise,
+                    x_start,
+                    mask,
+                    t,
+                    x_t=x_t,
+                ),
             }[self.model_mean_type]
             assert model_output.shape == target.shape == x_start.shape
             if self.use_wavelet_loss:
-                # 低频和高频loss自适应平衡，总和为2
-                from freq_wavelet import HaarDWT
-                dwt = HaarDWT()
-                err = target - model_output  # (B,C,H,W)
-                # NaN/Inf 调试计数
+                dwt, _ = self._get_wavelet()
                 with th.no_grad():
                     terms["nan_output"] = th.isfinite(model_output).logical_not().float().mean()
                     terms["nan_target"] = th.isfinite(target).logical_not().float().mean()
-                err_d = dwt(err)             # (B,4C,H/2,W/2)
-                B, C4, Hh, Wh = err_d.shape
-                C = C4 // 4
-                err_LL = err_d[:, :C]
-                err_HF = err_d[:, C:]
-                # 数值稳定：逐样本展开后再求均值，避免单一标量丢失 batch 信息
-                err_LL_sq = (err_LL.clamp(min=-50, max=50) ** 2).view(B, -1).mean(dim=1)  # (B)
-                err_HF_sq = (err_HF.clamp(min=-50, max=50) ** 2).view(B, -1).mean(dim=1)  # (B)
+
+                # The target already contains the correct single- or
+                # dual-schedule DoD definition. The same wavelet residual
+                # loss is therefore used for both modes.
+                err = target - model_output
+                err_d = dwt(err)
+                batch_size, channels4, _, _ = err_d.shape
+                if channels4 % 4 != 0:
+                    raise RuntimeError(
+                        f"Expected the DWT channel count to be divisible by 4, "
+                        f"got {channels4}."
+                    )
+                channels = channels4 // 4
+                err_LL = err_d[:, :channels].clamp(min=-50, max=50)
+                err_HF = err_d[:, channels:].clamp(min=-50, max=50)
+                err_LL_sq = (err_LL ** 2).view(batch_size, -1).mean(dim=1)
+                err_HF_sq = (err_HF ** 2).view(batch_size, -1).mean(dim=1)
+
                 terms["loss_ll"] = err_LL_sq
                 terms["loss_hf"] = err_HF_sq
                 # 自适应权重：loss越大权重越小，权重和为2
@@ -900,7 +1003,7 @@ class GaussianDiffusion:
                 w_hf = 2.0 * inv_hf / (sum_inv + eps)
                 terms["w_ll"] = w_ll
                 terms["w_hf"] = w_hf
-                terms["mse"] = w_ll * err_LL_sq + w_hf * err_HF_sq  # (B)
+                terms["mse"] = w_ll * err_LL_sq + w_hf * err_HF_sq
             else:
                 raw_mse = mean_flat((target - model_output) ** 2)  # (B)
                 terms["mse"] = raw_mse
@@ -1041,11 +1144,10 @@ class GaussianDiffusion:
                 sample = x0_pred + _extract_into_tensor(self.sqrt_one_minus_alphas_cumprod, t-1, x.shape) * deviation_direction_previous
             else:
                 sample = x0_pred
-            return {"sample": sample}
+            return {"sample": sample, "deviation": deviation_direction}
         else:
             # 双频回溯：DWT 分离 deviation 与当前 latent，按各自频率 ᾱ 反推
-            from freq_wavelet import HaarDWT, HaarIWT
-            dwt = HaarDWT(); iwt = HaarIWT()
+            dwt, iwt = self._get_wavelet()
             x_d = dwt(x)                     # (B,4C,H/2,W/2)
             dev_d = dwt(deviation_direction) # (B,4C,H/2,W/2)
             B, C4, Hh, Wh = x_d.shape; C = C4 // 4
@@ -1065,7 +1167,7 @@ class GaussianDiffusion:
                 x_prev_L = x0_L; x_prev_H = x0_H
             x_prev_d = th.cat([x_prev_L, x_prev_H], dim=1)
             sample = iwt(x_prev_d)
-            return {"sample": sample}
+            return {"sample": sample, "deviation": deviation_direction}
     
 
     def ddim_deviation_sample_loop(
@@ -1191,4 +1293,3 @@ def _extract_into_tensor(arr, timesteps, broadcast_shape):
     while len(res.shape) < len(broadcast_shape):
         res = res[..., None]
     return res + th.zeros(broadcast_shape, device=timesteps.device)
-
