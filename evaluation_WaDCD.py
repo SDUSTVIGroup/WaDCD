@@ -71,6 +71,8 @@ def compute_pro(masks: ndarray, amaps: ndarray, num_th: int = 200) -> None:
 
     # Normalize FPR from 0 ~ 1 to 0 ~ 0.3
     df = df[df["fpr"] < 0.3]
+    if len(df) < 2:
+        return 0.0
     df["fpr"] = df["fpr"] / df["fpr"].max()
 
     pro_auc = auc(df["fpr"], df["pro"])
@@ -95,7 +97,10 @@ def calculate_metrics(ground_truth, prediction):
     auroc_score = auroc(torch.from_numpy(flat_pred), torch.from_numpy(flat_gt.astype(int)))
 
     f1max = metrics.F1Max()
-    f1_max_score = f1max(torch.from_numpy(flat_pred), torch.from_numpy(flat_gt.astype(int)))
+    try:
+        f1_max_score = f1max(torch.from_numpy(flat_pred), torch.from_numpy(flat_gt.astype(int)))
+    except (IndexError, RuntimeError):
+        f1_max_score = torch.tensor(0.0)
     
     ap = average_precision_score(ground_truth.flatten(), prediction.flatten())
     
@@ -111,7 +116,10 @@ def calculate_metrics(ground_truth, prediction):
 
     apsp = average_precision_score(gt_list_sp, pr_list_sp)
     aurocsp = auroc(torch.from_numpy(pr_list_sp), torch.from_numpy(gt_list_sp))
-    f1sp = f1max(torch.from_numpy(pr_list_sp), torch.from_numpy(gt_list_sp))
+    try:
+        f1sp = f1max(torch.from_numpy(pr_list_sp), torch.from_numpy(gt_list_sp))
+    except (IndexError, RuntimeError):
+        f1sp = torch.tensor(0.0)
     
     return auroc_score.numpy(), aupro_score ,f1_max_score.numpy(), ap, aurocsp.numpy(), apsp, f1sp.numpy()
 
@@ -156,7 +164,9 @@ def bhpf_highfreq_map(x_img: torch.Tensor, cutoff: int = 40, order: int = 2) -> 
 
     
 
-def calculate_anomaly_maps(x0_s, encoded_s,  image_samples_s, latent_samples_s, center_size=256):
+def calculate_anomaly_maps(x0_s, encoded_s,  image_samples_s, latent_samples_s, center_size=256, args=None):
+    gamma_img = getattr(args, 'gamma_img', 0.4)
+    gamma_lat = getattr(args, 'gamma_lat', 0.2)
     pred_geometric = []
     pred_aritmetic = []
     image_differences = []
@@ -164,24 +174,24 @@ def calculate_anomaly_maps(x0_s, encoded_s,  image_samples_s, latent_samples_s, 
     input_images = []
     output_images = []
     for x, encoded,  image_samples, latent_samples in zip(x0_s, encoded_s,  image_samples_s, latent_samples_s):
-            
+
         input_image = ((np.clip(x[0].detach().cpu().numpy(), -1, 1).transpose(1,2,0))*127.5+127.5).astype(np.uint8)
         output_image = ((np.clip(image_samples[0].detach().cpu().numpy(), -1, 1).transpose(1,2,0))*127.5+127.5).astype(np.uint8)
         input_images.append(input_image)
         output_images.append(output_image)
 
         image_difference = (((((torch.abs(image_samples-x))).to(torch.float32)).mean(axis=0)).detach().cpu().numpy().transpose(1,2,0).max(axis=2))
-        image_difference = (np.clip(image_difference, 0.0, 0.4) ) * 2.5
+        image_difference = np.clip(image_difference, 0.0, gamma_img) / gamma_img
         image_difference = smooth_mask(image_difference, sigma=3)
         image_differences.append(image_difference)
-        
+
         # 对齐通道数：当启用频域通道时 latent_samples 可能为 5c，而 encoded 为 4c，这里仅比较前 4 个 VAE 通道
         if latent_samples.shape[1] != encoded.shape[1]:
             latent_samples_cmp = latent_samples[:, :encoded.shape[1], ...]
         else:
             latent_samples_cmp = latent_samples
         latent_difference = (((((torch.abs(latent_samples_cmp - encoded))).to(torch.float32)).mean(axis=0)).detach().cpu().numpy().transpose(1,2,0).mean(axis=2))
-        latent_difference = (np.clip(latent_difference, 0.0 , 0.2)) * 5
+        latent_difference = np.clip(latent_difference, 0.0, gamma_lat) / gamma_lat
         latent_difference = smooth_mask(latent_difference, sigma=1)
         latent_difference = resize(latent_difference, (center_size, center_size))
         latent_differences.append(latent_difference)
@@ -259,6 +269,9 @@ def evaluation(args):
         raise Exception("Please provide the trained model's path using --model_path")
     
 
+    # Load checkpoint first to auto-detect model type
+    ckpt_state = torch.load(ckpt)["model"]
+
     latent_size = int(args.center_size) // 8
     in_ch = 5 if getattr(args, 'freq_channel', False) else 4
     base_model = UNET_models[args.model_size](
@@ -266,23 +279,27 @@ def evaluation(args):
         ncls=args.num_classes,
         in_channels=in_ch,
     )
-    if getattr(args, "use_wavelet_mffa", False):
+
+    use_mffa = getattr(args, "use_wavelet_mffa", False)
+    use_sdem = getattr(args, "use_wavelet_sdem_gate", False)
+    # Auto-detect: only wrap if checkpoint actually has wavelet keys
+    ckpt_has_wavelet = any("mffa" in k or "sdem" in k or "dod_head" in k
+                           or "wgdrb" in k for k in ckpt_state.keys())
+    if (use_mffa or use_sdem) and not ckpt_has_wavelet:
+        print("[WaDCD Eval] WARNING: wavelet flags set but ckpt has no wavelet keys; using plain UNet.")
+        use_mffa = False; use_sdem = False
+    if use_mffa or use_sdem:
         model = WaveletDoDPredictor(
             base_model,
-            use_mffa=True,
-            use_sdem_gate=getattr(args, "use_wavelet_sdem_gate", False),
-            combine_mode=getattr(args, "wavelet_combine_mode", "wave-only"),
+            use_mffa=use_mffa,
+            use_sdem_gate=use_sdem,
+            combine_mode=getattr(args, "wavelet_combine_mode", "sum"),
         )
     else:
         model = base_model
-
-    # : 
-    #  wavelet  MFFA/SDEM  state_dict 
-    # 1)  ckpt 
-    ckpt_state = torch.load(ckpt)["model"]
     model_state = model.state_dict()
 
-    # 2) :  key  shape 
+    # 2) :  key shape 
     filtered_state = {}
     skipped_keys = []
     for k, v in ckpt_state.items():
@@ -331,6 +348,7 @@ def evaluation(args):
             noise_schedule_low=args.noise_schedule_low,
             noise_schedule_high=args.noise_schedule_high,
             dual_schedule_sampling=args.dual_schedule_sampling,
+            wavelet_type=getattr(args, "wavelet_type", "haar"),
         )
             
 
@@ -342,8 +360,11 @@ def evaluation(args):
         
         if args.dataset=='mvtec':
             test_dataset = MVTECDataset('test', object_class=category, rootdir=args.data_dir, transform=transform, normal=False, anomaly_class=args.anomaly_class, image_size=args.image_size, center_size=args.actual_image_size, center_crop=args.center_crop)
-        else:
+        elif args.dataset=='visa':
             test_dataset = VISADataset('test', object_class=category, rootdir=args.data_dir, transform=transform, normal=False, anomaly_class=args.anomaly_class, image_size=args.image_size, center_size=args.actual_image_size, center_crop=args.center_crop)
+        else:
+            from MPDDDataLoader import MPDDDataset
+            test_dataset = MPDDDataset('test', object_class=category, rootdir=args.data_dir, transform=transform, normal=False, anomaly_class=args.anomaly_class, image_size=args.image_size, center_size=args.actual_image_size, center_crop=args.center_crop)
         test_loader = DataLoader(test_dataset, batch_size=8, shuffle=False, num_workers=4, drop_last=False)
         
         for ii, (x, seg, object_cls) in enumerate(test_loader):
@@ -380,7 +401,7 @@ def evaluation(args):
             x0_s += [_x0.unsqueeze(0) for _x0 in x0]
 
         print(category)        
-        anomaly_maps = calculate_anomaly_maps(x0_s, encoded_s,  image_samples_s, latent_samples_s, center_size=args.center_size)
+        anomaly_maps = calculate_anomaly_maps(x0_s, encoded_s,  image_samples_s, latent_samples_s, center_size=args.center_size, args=args)
         metrics_dict = evaluate_anomaly_maps(anomaly_maps, np.stack(segmentation_s, axis=0))
         # 记录本类用于汇总的指标（从指定 report_key 选择）；默认 anomaly_geometric
         if not hasattr(args, 'dataset_summary'):
@@ -416,7 +437,7 @@ def evaluation(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", type=str, choices=['mvtec','visa'], default="mvtec")
+    parser.add_argument("--dataset", type=str, choices=['mvtec','visa','mpdd'], default="mvtec")
     parser.add_argument("--data-dir", type=str, default='./mvtec-dataset/')
     parser.add_argument("--model-size", type=str, choices=['UNet_XS','UNet_S', 'UNet_M', 'UNet_L', 'UNet_XL'], default='UNet_L')
     parser.add_argument("--image-size", type=int, default= 288)
@@ -452,6 +473,12 @@ if __name__ == "__main__":
     parser.add_argument("--use-wavelet-sdem-gate", type=lambda v: True if v.lower() in ('yes','true','t','y','1') else False,
                         default=False,
                         help="是否在 Wavelet DoD Predictor 上叠加 SDEM-style 细节门控")
+    parser.add_argument("--wavelet-type", type=str, choices=["haar", "db2"], default="haar",
+                        help="小波类型：haar（默认）或 db2")
+    parser.add_argument("--gamma-lat", type=float, default=0.2,
+                        help="Latent discrepancy clipping threshold")
+    parser.add_argument("--gamma-img", type=float, default=0.4,
+                        help="Image discrepancy clipping threshold")
     parser.add_argument("--wavelet-combine-mode", type=str,
                         choices=["unet-only", "wave-only", "sum"],
                         default="wave-only",
@@ -462,6 +489,8 @@ if __name__ == "__main__":
         args.num_classes = 15
     elif args.dataset == 'visa':
         args.num_classes = 12
+    elif args.dataset == 'mpdd':
+        args.num_classes = 6
     args.results_dir = f"./WaDCD_{args.dataset}_{args.object_category}_{args.model_size}_{args.center_size}"
     if args.center_crop:
         args.results_dir += "_CenterCrop"
@@ -501,6 +530,15 @@ if __name__ == "__main__":
             "pcb1",
             "pcb3",
             "pipe_fryum"
+            ]
+    elif args.object_category=='all' and args.dataset=='mpdd':
+        args.categories=[
+            "bracket_black",
+            "bracket_brown",
+            "bracket_white",
+            "connector",
+            "metal_plate",
+            "tubes"
             ]
     else:
         args.categories = [args.object_category]
