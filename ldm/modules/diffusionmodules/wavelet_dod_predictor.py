@@ -206,22 +206,19 @@ class WaveletDoDPredictor(nn.Module):
         self.combine_mode = combine_mode
 
         # 波形变换在 latent 维度上工作，通道数与 latent 一致
-        # 在第一次前向时根据输入通道数 lazy init MFFA/SDEM
         self.dwt = DWT_2D()
         self.idwt = IDWT_2D()
-        self.mffa: Optional[WaveletMFFA] = None
-        self.sdem_gate: Optional[WaveletSDEMGate] = None
-        self.dod_head: Optional[nn.Conv2d] = None  # wavelet分支DoD预测头
-
         self.num_heads = num_heads
 
+        # For state_dict matching, sub-modules must be created in __init__, not lazily.
+        in_ch = base_model.in_channels
+        self.mffa = WaveletMFFA(in_ch, hidden_channels=in_ch, num_heads=num_heads) if use_mffa else None
+        self.sdem_gate = WaveletSDEMGate(in_ch * 4) if use_sdem_gate else None
+        self.dod_head = nn.Conv2d(in_ch, in_ch, kernel_size=1) if (use_mffa or use_sdem_gate) else None
+
     def _lazy_build(self, in_channels: int):
-        if self.mffa is None and self.use_mffa:
-            self.mffa = WaveletMFFA(in_channels, hidden_channels=in_channels, num_heads=self.num_heads)
-        if self.sdem_gate is None and self.use_sdem_gate:
-            self.sdem_gate = WaveletSDEMGate(in_channels * 4)
-        if self.dod_head is None:
-            self.dod_head = nn.Conv2d(in_channels, in_channels, kernel_size=1)
+        # Kept for backward compatibility; all modules are already created in __init__.
+        pass
 
     def forward(self, x: torch.Tensor, t: torch.Tensor, context=None, mask=None):
         """Forward like UNetModel: returns eta_hat.
@@ -241,6 +238,8 @@ class WaveletDoDPredictor(nn.Module):
             self.mffa.to(device=device, dtype=dtype)
         if self.sdem_gate is not None:
             self.sdem_gate.to(device=device, dtype=dtype)
+        if self.dod_head is not None:
+            self.dod_head.to(device=device, dtype=dtype)
 
         # 1) Wavelet decomposition of latent
         coeffs = self.dwt(x)  # (B,4C,H/2,W/2)
