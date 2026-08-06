@@ -8,8 +8,9 @@
 
 ## Approach
 
-<img width="1767" height="845" alt="image1" src="https://github.com/user-attachments/assets/2613fac5-24a7-4f0c-96c4-57b891d60dbc" />
-<img width="1764" height="892" alt="image2" src="https://github.com/user-attachments/assets/44d629d1-83e9-4f0e-afe8-8585acbcdc87" />
+<img width="1714" height="818" alt="framework1" src="https://github.com/user-attachments/assets/ef99f207-8c56-44ee-b34a-9b0ddb7faab5" />
+<img width="1705" height="864" alt="framework2" src="https://github.com/user-attachments/assets/0056ae0a-6539-4142-b57c-04a5feab8099" />
+
 
 
 ---
