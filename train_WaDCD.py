@@ -222,13 +222,15 @@ def main(args):
         ncls=args.num_classes,
         in_channels=in_ch,
     )
-    # Wavelet DoD Predictor 外壳：可选 DWT+MFFA 和 SDEM gate
-    if getattr(args, "use_wavelet_mffa", False):
+    # Wavelet DoD Predictor 外壳：可选 MFFA 和/或 SDEM gate (WGDRB)
+    use_mffa = getattr(args, "use_wavelet_mffa", False)
+    use_sdem = getattr(args, "use_wavelet_sdem_gate", False)
+    if use_mffa or use_sdem:
         model = WaveletDoDPredictor(
             base_model,
-            use_mffa=True,
-            use_sdem_gate=getattr(args, "use_wavelet_sdem_gate", False),
-            combine_mode=getattr(args, "wavelet_combine_mode", "wave-only"),
+            use_mffa=use_mffa,
+            use_sdem_gate=use_sdem,
+            combine_mode=getattr(args, "wavelet_combine_mode", "sum"),
         )
     else:
         model = base_model
@@ -281,7 +283,8 @@ def main(args):
                                  noise_schedule_high=args.noise_schedule_high,
                                  lambda_hf=args.lambda_hf,
                                  use_wavelet_loss=args.wavelet_loss,
-                                 freq_noise_scale_high=args.freq_noise_scale_high)
+                                 freq_noise_scale_high=args.freq_noise_scale_high,
+                                 wavelet_type=getattr(args, "wavelet_type", "haar"))
     # 离线优先加载 VAE
     project_root = os.path.dirname(os.path.abspath(__file__))
     candidate_dirs = []
@@ -325,6 +328,9 @@ def main(args):
         dataset = MVTECDataset('train', object_class=args.object_category, rootdir=args.data_dir, transform=transform, image_size=args.image_size,  center_size=args.center_size, augment=args.augmentation, center_crop=args.center_crop)
     elif args.dataset=='visa':
         dataset = VISADataset('train', object_class=args.object_category, rootdir=args.data_dir, transform=transform, image_size=args.image_size,  center_size=args.center_size, augment=args.augmentation, center_crop=args.center_crop)
+    elif args.dataset=='mpdd':
+        from MPDDDataLoader import MPDDDataset
+        dataset = MPDDDataset('train', object_class=args.object_category, rootdir=args.data_dir, transform=transform, image_size=args.image_size,  center_size=args.center_size, augment=args.augmentation, center_crop=args.center_crop)
        
     batch_size = args.global_batch_size // dist.get_world_size()
     loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4, drop_last=False)
@@ -566,7 +572,7 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", type=str, choices=['mvtec','visa'], default="mvtec")
+    parser.add_argument("--dataset", type=str, choices=['mvtec','visa','mpdd'], default="mvtec")
     parser.add_argument("--data-dir", type=str, default='./mvtec-dataset/')
     parser.add_argument("--model-size", type=str, choices=['UNet_XS','UNet_S', 'UNet_M', 'UNet_L', 'UNet_XL'], default='UNet_L')
     parser.add_argument("--image-size", type=int, default= 288)
@@ -624,6 +630,8 @@ if __name__ == "__main__":
     parser.add_argument("--use-wavelet-sdem-gate", type=lambda v: True if v.lower() in ('yes','true','t','y','1') else False,
                         default=False,
                         help="是否在 Wavelet DoD Predictor 上叠加 SDEM-style 细节门控")
+    parser.add_argument("--wavelet-type", type=str, choices=["haar", "db2"], default="haar",
+                        help="小波类型：haar（默认）或 db2（Daubechies-2）")
     parser.add_argument("--wavelet-combine-mode", type=str,
                         choices=["unet-only", "wave-only", "sum"],
                         default="wave-only",
@@ -640,6 +648,8 @@ if __name__ == "__main__":
         args.num_classes = 15
     elif args.dataset == 'visa':
         args.num_classes = 12
+    elif args.dataset == 'mpdd':
+        args.num_classes = 6
     args.results_dir = f"./WaDCD_{args.dataset}_{args.object_category}_{args.model_size}_{args.center_size}"
     if args.center_crop:
         args.results_dir += "_CenterCrop"
