@@ -286,7 +286,6 @@ def evaluation(args):
     ckpt_has_wavelet = any("mffa" in k or "sdem" in k or "dod_head" in k
                            or "wgdrb" in k for k in ckpt_state.keys())
     if (use_mffa or use_sdem) and not ckpt_has_wavelet:
-        print("[WaDCD Eval] WARNING: wavelet flags set but ckpt has no wavelet keys; using plain UNet.")
         use_mffa = False; use_sdem = False
     if use_mffa or use_sdem:
         model = WaveletDoDPredictor(
